@@ -22,7 +22,7 @@ def get_post_detail():
     # query parameter
     post_url = request.args.get('url')
     result = category_service.get_post_detail(post_url)
-    return jsonify({'category': result , 'status': 200})
+    return jsonify({'data': result , 'status': 200})
 
 
 

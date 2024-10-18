@@ -5,6 +5,8 @@ import json
 import urllib.parse
 import re
 
+from src.config import cookies, headers
+
 url = 'https://www.straitstimes.com'
 
 
@@ -49,31 +51,59 @@ def get_post_by_category(category_name, page=0):
 
 
 def get_post_detail(post_url):
-    response = requests.get(url + post_url)
+    response = requests.get(url + post_url , cookies = cookies , headers = headers)
+    data = []
+    soup = BeautifulSoup(response.content, "lxml")
 
-    soup = BeautifulSoup(response.content, "html.parser")
+    # Get the title of the post
+    try:
+        title = soup.find('h1', {'class': 'headline'}).text.strip()
+    except:
+        title = None
 
-    print("HTML content has been written to output.txt")
+    # Get the main content of the post
+    try:
+        # Assuming the content is in a specific div. Adjust the class name as needed.
+        content_div = soup.find('div', {'class': 'layout layout--onecol'})
+        html_content = str(content_div)  # Get the raw HTML content of the post
+    except:
+        html_content = None
 
-    script_tag = soup.find("script", string=lambda s: s and "window.__staticRouterHydrationData" in s)
+    # Get all images in the content
+    images = []
+    try:
+        img_tags = content_div.find_all('img')
+        for img in img_tags:
+            img_url = img.get('src')
+            if img_url:
+                images.append(img_url)
+    except:
+        pass
 
-    if script_tag:
-        script_content = script_tag.string
+    # Get all linked CSS files (external)
+    css_links = []
+    try:
+        link_tags = soup.find_all('link', {'rel': 'stylesheet'})
+        for link in link_tags:
+            css_url = link.get('href')
+            if css_url:
+                css_links.append(css_url)
+    except:
+        pass
 
-        match = re.search(r'JSON\.parse\("(.+?)"\)', script_content)
-        if match:
+    # Get inline CSS (if any within the content)
+    inline_css = []
+    try:
+        style_tags = soup.find_all('style')
+        for style in style_tags:
+            inline_css.append(style.text)
+    except:
+        pass
 
-            encoded_json_string = match.group(1)
-            cleaned_json_string = encoded_json_string.replace('\\"', '"')
-            data_dict = json.loads(cleaned_json_string)
-            dataRaw = data_dict["loaderData"]["1"]
-            decoded_json_string = urllib.parse.unquote(dataRaw)
-            dataJson = json.loads(decoded_json_string)
-
-            return dataJson
-        else:
-            print("No JSON data found in the script.")
-            return None
-    else:
-        print("No matching <script> tag found.")
-        return None
+    return {
+        'title': title,
+        'html_content': html_content,  # Raw HTML of the post content
+        'images': images,  # List of image URLs
+        'css_links': css_links,  # List of external CSS URLs
+        'inline_css': inline_css  # Any inline CSS found
+    }
