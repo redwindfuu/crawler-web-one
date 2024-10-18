@@ -29,10 +29,11 @@ def get_category():
     for category in categories:
         if not _.find(result, lambda x: x['name'] == category['name']):
             result.append(category)
-    return result
+    return _.filter_(result, lambda x: x['url'] != '/')
 
-def get_post_by_category(category_name):
-    response = requests.get(url + category_name)
+def get_post_by_category(category_name, page=0):
+    url_page = url + category_name + '?page=' + str(page)
+    response = requests.get(url_page)
     soup = BeautifulSoup(response.text, "html.parser")
     content_div = soup.select_one('div.view.view-articles > div.view-content.row')
     list_post = []
@@ -45,3 +46,34 @@ def get_post_by_category(category_name):
                 }
         list_post.append(post)
     return list_post
+
+
+def get_post_detail(post_url):
+    response = requests.get(url + post_url)
+
+    soup = BeautifulSoup(response.content, "html.parser")
+
+    print("HTML content has been written to output.txt")
+
+    script_tag = soup.find("script", string=lambda s: s and "window.__staticRouterHydrationData" in s)
+
+    if script_tag:
+        script_content = script_tag.string
+
+        match = re.search(r'JSON\.parse\("(.+?)"\)', script_content)
+        if match:
+
+            encoded_json_string = match.group(1)
+            cleaned_json_string = encoded_json_string.replace('\\"', '"')
+            data_dict = json.loads(cleaned_json_string)
+            dataRaw = data_dict["loaderData"]["1"]
+            decoded_json_string = urllib.parse.unquote(dataRaw)
+            dataJson = json.loads(decoded_json_string)
+
+            return dataJson
+        else:
+            print("No JSON data found in the script.")
+            return None
+    else:
+        print("No matching <script> tag found.")
+        return None
